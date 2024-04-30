@@ -1,0 +1,60 @@
+name: Run Python Script Every Week
+
+on:
+  schedule:
+    - cron: '0 0 * * 4'  # Runs At 12:00 AM, only on Thursday
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up Python environment
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+
+    - name: Install Chrome
+      run: |
+        wget https://mirror.cs.uchicago.edu/google-chrome/pool/main/g/google-chrome-stable/google-chrome-stable_114.0.5735.90-1_amd64.deb
+        sudo apt-get install -y --allow-downgrades ./google-chrome-stable_114.0.5735.90-1_amd64.deb
+
+    - name: Install ChromeDriver
+      run: |
+        CHROME_VERSION=$(google-chrome-stable --version | awk '{ print $3 }' | awk -F'.' '{ print $1 }')
+        wget https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip
+        unzip chromedriver_linux64.zip
+        sudo mv chromedriver /usr/bin/chromedriver
+        sudo chmod +x /usr/bin/chromedriver
+
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+
+    - name: Run Python script
+      run: python get_cnbc.py
+      env:
+        CNBC_LOGIN: ${{ secrets.CNBC_LOGIN }}
+        CNBC_PASSWORD: ${{ secrets.CNBC_PASSWORD }}
+
+    - name: Debugging git changes
+      run: |
+        git status
+        git diff
+
+    - name: Commit changes to cnbc_data.json
+      run: |
+        git config user.name "GitHub Actions Bot"
+        git config user.email "<>"
+        git add cnbc_data.json  # Replace with the actual file path
+        git add .gitignore
+        TODAY_DATE=$(date +'%Y-%m-%d')
+        git commit -m "Update cnbc_data.json - $TODAY_DATE"
+        git push origin main  # Assuming you want to push to the master branch
